@@ -11,6 +11,7 @@ class BertCls(torch.nn.Module):
         self.bert = BertModel.from_pretrained(config.bert_model_path)
         self.liner = torch.nn.Sequential(
             torch.nn.Linear(768 * 2, 256),
+            torch.nn.Dropout(),
             torch.nn.ReLU(),
             torch.nn.Linear(256, 1),
             torch.nn.Sigmoid()
@@ -47,6 +48,7 @@ def train(model, train_data, test_data, epco=30):
             loss.backward()
             optimizer.step()
 
+            # 指数平均
             loss_sum = 0.9 * loss_sum + 0.1 * loss
             if idx % 100 == 99:
                 test_loss = cal_loss(model, test_data)
@@ -55,12 +57,14 @@ def train(model, train_data, test_data, epco=30):
 
 
 def cal_loss(model, data):
+    loss_sum = 0.7
     loss_fn = torch.nn.BCELoss()
     with torch.no_grad():
         for s1, s2, l in data:
             y = model(s1, s2)
             loss = loss_fn(y, l)
-    return loss
+            loss_sum = 0.9 * loss_sum + 0.1 * loss
+    return loss_sum
 
 
 def evaluate(model, test_data):
@@ -90,7 +94,7 @@ if __name__ == '__main__':
     train_data, test_data = get_dataloader()
     cls_model = BertCls()
     cls_model.cuda()
-    freeze_parameter(cls_model)
+    # freeze_parameter(cls_model)
     train(cls_model, train_data, test_data, epco=100)
     evaluate(cls_model, train_data)
     evaluate(cls_model, test_data)
