@@ -10,6 +10,8 @@ class BertCls(torch.nn.Module):
         super(BertCls, self).__init__()
         self.bert = BertModel.from_pretrained(config.bert_model_path)
         self.liner = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(768 * 2),
+            torch.nn.Dropout(),
             torch.nn.Linear(768 * 2, 256),
             torch.nn.BatchNorm1d(256),
             torch.nn.Dropout(),
@@ -37,7 +39,7 @@ def freeze_parameter(cls_model):
 
 def train(model, train_data, test_data, epoch=30):
     loss_fn = torch.nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.00001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     loss_sum = 0.7
     idx = 0
@@ -95,7 +97,7 @@ if __name__ == '__main__':
     train_data, test_data = get_dataloader()
     cls_model = BertCls()
     cls_model.cuda()
-    # freeze_parameter(cls_model)
+    freeze_parameter(cls_model)
     train(cls_model, train_data, test_data, epoch=50)
     evaluate(cls_model, train_data)
     evaluate(cls_model, test_data)
