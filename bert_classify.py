@@ -35,13 +35,13 @@ def freeze_parameter(cls_model):
             p.requires_grad = True
 
 
-def train(model, train_data, test_data, epco=30):
+def train(model, train_data, test_data, epoch=30):
     loss_fn = torch.nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.00001)
 
     loss_sum = 0.7
     idx = 0
-    for e in range(epco):
+    for e in range(epoch):
         for s1, s2, l in train_data:
             optimizer.zero_grad()
             y = model(s1, s2)
@@ -53,7 +53,7 @@ def train(model, train_data, test_data, epco=30):
             loss_sum = 0.9 * loss_sum + 0.1 * loss
             if idx % 100 == 99:
                 test_loss = cal_loss(model, test_data)
-                print('epco:{} iter:{} loss:{} test_loss:{}'.format(e, idx, loss_sum, test_loss))
+                print('epoch:{} iter:{} loss:{} test_loss:{}'.format(e, idx, loss_sum, test_loss))
             idx += 1
 
 
@@ -96,6 +96,6 @@ if __name__ == '__main__':
     cls_model = BertCls()
     cls_model.cuda()
     # freeze_parameter(cls_model)
-    train(cls_model, train_data, test_data, epco=50)
+    train(cls_model, train_data, test_data, epoch=50)
     evaluate(cls_model, train_data)
     evaluate(cls_model, test_data)
