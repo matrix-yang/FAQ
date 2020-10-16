@@ -11,6 +11,7 @@ class BertCls(torch.nn.Module):
         self.bert = BertModel.from_pretrained(config.bert_model_path)
         self.liner = torch.nn.Sequential(
             torch.nn.Linear(768 * 2, 256),
+            torch.nn.BatchNorm1d(256),
             torch.nn.Dropout(),
             torch.nn.ReLU(),
             torch.nn.Linear(256, 1),
@@ -95,6 +96,6 @@ if __name__ == '__main__':
     cls_model = BertCls()
     cls_model.cuda()
     # freeze_parameter(cls_model)
-    train(cls_model, train_data, test_data, epco=100)
+    train(cls_model, train_data, test_data, epco=50)
     evaluate(cls_model, train_data)
     evaluate(cls_model, test_data)
