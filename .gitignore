@@ -1,0 +1,6 @@
+.idea
+*.csv
+*.log
+./pretrain_model
+./其他参考资料/
+./data
