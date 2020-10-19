@@ -1,8 +1,8 @@
 import torch
-from transformers import BertModel
+from transformers import BertModel, XLNetModel
 import torch.optim as optim
 from utils import config
-from utils.process_data import get_dataloader
+from utils.process_data import get_bert_dataloader, get_xlnet_dataloader
 
 
 class BertCls(torch.nn.Module):
@@ -28,6 +28,29 @@ class BertCls(torch.nn.Module):
         return out
 
 
+class XLNetCls(torch.nn.Module):
+    def __init__(self):
+        super(XLNetCls, self).__init__()
+        self.xlnet = XLNetModel.from_pretrained(config.XLNet_model_path)
+        self.liner = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(768 * 2),
+            torch.nn.Dropout(),
+            torch.nn.Linear(768 * 2, 256),
+            torch.nn.BatchNorm1d(256),
+            torch.nn.Dropout(),
+            torch.nn.ReLU(),
+            torch.nn.Linear(256, 1),
+            torch.nn.Sigmoid()
+        )
+
+    def forward(self, ste1, ste2):
+        ebd1 = self.xlnet(ste1)[0]
+        ebd2 = self.xlnet(ste2)[0]
+        conact = torch.cat((ebd1[:, -1, :], ebd2[:, -1, :]), dim=1)
+        out = self.liner(conact)
+        return out
+
+
 def freeze_parameter(cls_model):
     for n, p in cls_model.named_parameters():
         if 'bert' in n:
@@ -39,7 +62,7 @@ def freeze_parameter(cls_model):
 
 def train(model, train_data, test_data, epoch=30):
     loss_fn = torch.nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.00001)
 
     loss_sum = 0.7
     idx = 0
@@ -94,10 +117,13 @@ def evaluate(model, test_data):
 
 
 if __name__ == '__main__':
-    train_data, test_data = get_dataloader()
-    cls_model = BertCls()
+    # cls_model = BertCls()
+    # freeze_parameter(cls_model)
+
+    cls_model = XLNetCls()
     cls_model.cuda()
-    freeze_parameter(cls_model)
+
+    train_data, test_data = get_xlnet_dataloader()
     train(cls_model, train_data, test_data, epoch=50)
     evaluate(cls_model, train_data)
     evaluate(cls_model, test_data)

@@ -1,6 +1,6 @@
 import torch
-from torch.utils.data import Dataset, DataLoader, RandomSampler
-from transformers import BertTokenizer
+from torch.utils.data import Dataset, DataLoader
+from transformers import BertTokenizer, XLNetTokenizer
 import csv
 from utils import config
 
@@ -37,8 +37,7 @@ def read_corp(path):
     return ste_pairs
 
 
-def get_dataloader():
-    bert_tokenizer = BertTokenizer.from_pretrained(config.bert_model_path)
+def get_dataloader(tokenizer):
     p_pairs = read_corp('F:/workcode/FAQ/data/subwayQq_positive_label.csv')
     n_pairs = read_corp('F:/workcode/FAQ/data/subwayQq_negative_label.csv')
     all_paris = p_pairs + n_pairs
@@ -52,8 +51,18 @@ def get_dataloader():
             train_pairs.append(p)
         idx += 1
 
-    train_ds = PairDS(train_pairs, bert_tokenizer)
-    test_ds = PairDS(test_pairs, bert_tokenizer)
+    train_ds = PairDS(train_pairs, tokenizer)
+    test_ds = PairDS(test_pairs, tokenizer)
     train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_ds, batch_size=32, shuffle=True)
     return train_loader, test_loader
+
+
+def get_bert_dataloader():
+    bert_tokenizer = BertTokenizer.from_pretrained(config.bert_model_path)
+    return get_dataloader(bert_tokenizer)
+
+
+def get_xlnet_dataloader():
+    xlnet_tokenizer = XLNetTokenizer.from_pretrained(config.XLNet_model_path)
+    return get_dataloader(xlnet_tokenizer)
