@@ -10,16 +10,32 @@ class BertCls(torch.nn.Module):
         super(BertCls, self).__init__()
         self.bert = BertModel.from_pretrained(config.BERT_MODEL_PATH)
         self.liner = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(768 * 2),
+            torch.nn.BatchNorm1d(config.EMBEDDING_DIM * 2),
             torch.nn.Dropout(),
-            torch.nn.Linear(768 * 2, 1),
+            torch.nn.Linear(config.EMBEDDING_DIM * 2, 1),
             torch.nn.Sigmoid()
         )
+
+        #句子的注意力变量(1*50),各个子的ebd
+        self.weight1 = torch.nn.Linear(1, config.SENTENCE_MAX_LEN, bias=False)
+        self.weight2 = torch.nn.Linear(1, config.SENTENCE_MAX_LEN, bias=False)
+
+    def cal_ste_ebd(self, ebd1, ebd2):
+        batch, len_, dim = ebd1.shape
+        one = torch.ones((batch, 1, 1), device=config.DEVICE)
+        atte1 = self.weight1(one)
+        atte2 = self.weight2(one)
+        ste_ebd1 = torch.bmm(atte1, ebd1).view(batch, config.EMBEDDING_DIM)
+        ste_ebd2 = torch.bmm(atte2, ebd2).view(batch, config.EMBEDDING_DIM)
+        return ste_ebd1, ste_ebd2
 
     def forward(self, ste1, ste2):
         ebd1, cls1 = self.bert(ste1)
         ebd2, cls2 = self.bert(ste2)
-        conact = torch.cat((ebd1[:, 0, :], ebd2[:, 0, :]), dim=1)
+        ste_ebd1, ste_ebd2 = self.cal_ste_ebd(ebd1, ebd2)
+        # max_pool1, indices1 = torch.max(ebd1, dim=1)
+        # max_pool2, indices2 = torch.max(ebd2, dim=1)
+        conact = torch.cat((ste_ebd1, ste_ebd2), dim=1)
         out = self.liner(conact)
         return out
 
@@ -29,9 +45,9 @@ class BertClsJoint(torch.nn.Module):
         super(BertClsJoint, self).__init__()
         self.bert = BertModel.from_pretrained(config.BERT_MODEL_PATH)
         self.liner = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(768),
+            torch.nn.BatchNorm1d(config.EMBEDDING_DIM),
             torch.nn.Dropout(),
-            torch.nn.Linear(768, 1),
+            torch.nn.Linear(config.EMBEDDING_DIM, 1),
             torch.nn.Sigmoid()
         )
 
@@ -47,9 +63,9 @@ class XLNetCls(torch.nn.Module):
         super(XLNetCls, self).__init__()
         self.xlnet = XLNetModel.from_pretrained(config.XLNET_MODEL_PATH)
         self.liner = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(768 * 2),
+            torch.nn.BatchNorm1d(config.EMBEDDING_DIM * 2),
             torch.nn.Dropout(),
-            torch.nn.Linear(768 * 2, 256),
+            torch.nn.Linear(config.EMBEDDING_DIM * 2, 256),
             torch.nn.BatchNorm1d(256),
             torch.nn.Dropout(),
             torch.nn.ReLU(),

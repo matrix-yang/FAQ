@@ -59,8 +59,8 @@ def get_dataloader(tokenizer, joint=False):
 
     train_ds = PairDS(train_pairs, tokenizer)
     test_ds = PairDS(test_pairs, tokenizer)
-    train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_ds, batch_size=32, shuffle=True)
+    train_loader = DataLoader(train_ds, batch_size=config.BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(test_ds, batch_size=config.BATCH_SIZE, shuffle=True)
     return train_loader, test_loader
 
 
