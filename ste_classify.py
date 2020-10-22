@@ -125,8 +125,13 @@ def evaluate(model, test_data):
     preidt_p = 0.1
     positive = 0.1
     with torch.no_grad():
-        for s1, s2, l in test_data:
-            y = model(s1, s2)
+        for td in test_data:
+            if config.JIONT:
+                s1, l = td
+                y = model(s1)
+            else:
+                s1, s2, l = td
+                y = model(s1, s2)
             y = y.cpu().view(-1).numpy()
             y[y > 0.5] = 1
             y[y <= 0.5] = 0
@@ -143,7 +148,7 @@ def evaluate(model, test_data):
 
 
 if __name__ == '__main__':
-    #bert 2 ste
+    # bert 2 ste
     # bert joint ste
     if config.JIONT:
         cls_model = BertClsJoint()
@@ -155,7 +160,6 @@ if __name__ == '__main__':
     train(cls_model, train_data, test_data, epoch=50)
     evaluate(cls_model, train_data)
     evaluate(cls_model, test_data)
-
 
     # # xlnet
     # cls_model = XLNetCls()
