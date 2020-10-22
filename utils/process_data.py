@@ -12,15 +12,21 @@ class PairDS(Dataset):
 
     def __getitem__(self, index):
         s1, s2, l = self.pairs[index]
-        # s1_t = self.tokenizer.encode_plus(s1, pad_to_max_length=True, max_length=config.sentence_max_len)
-        # s2_t = self.tokenizer.encode_plus(s2, pad_to_max_length=True, max_length=config.sentence_max_len)
-        s1_t = self.tokenizer.encode(s1, pad_to_max_length=True, max_length=config.sentence_max_len)
-        s2_t = self.tokenizer.encode(s2, pad_to_max_length=True, max_length=config.sentence_max_len)
+        if config.JIONT:
+            s_t = self.tokenizer.encode(s1, s2, pad_to_max_length=True, max_length=config.sentence_max_len)
+            s_t = torch.tensor(s_t).cuda()
+            label = torch.tensor([l], dtype=torch.float).cuda()
+            return s_t, label
+        else:
+            # s1_t = self.tokenizer.encode_plus(s1, pad_to_max_length=True, max_length=config.sentence_max_len)
+            # s2_t = self.tokenizer.encode_plus(s2, pad_to_max_length=True, max_length=config.sentence_max_len)
+            s1_t = self.tokenizer.encode(s1, pad_to_max_length=True, max_length=config.sentence_max_len)
+            s2_t = self.tokenizer.encode(s2, pad_to_max_length=True, max_length=config.sentence_max_len)
 
-        s1_t = torch.tensor(s1_t).cuda()
-        s2_t = torch.tensor(s2_t).cuda()
-        label = torch.tensor([l], dtype=torch.float).cuda()
-        return s1_t, s2_t, label
+            s1_t = torch.tensor(s1_t).cuda()
+            s2_t = torch.tensor(s2_t).cuda()
+            label = torch.tensor([l], dtype=torch.float).cuda()
+            return s1_t, s2_t, label
 
     def __len__(self):
         return len(self.pairs)
@@ -37,7 +43,7 @@ def read_corp(path):
     return ste_pairs
 
 
-def get_dataloader(tokenizer):
+def get_dataloader(tokenizer, joint=False):
     p_pairs = read_corp('F:/workcode/FAQ/data/subwayQq_positive_label.csv')
     n_pairs = read_corp('F:/workcode/FAQ/data/subwayQq_negative_label.csv')
     all_paris = p_pairs + n_pairs

@@ -12,11 +12,7 @@ class BertCls(torch.nn.Module):
         self.liner = torch.nn.Sequential(
             torch.nn.BatchNorm1d(768 * 2),
             torch.nn.Dropout(),
-            torch.nn.Linear(768 * 2, 256),
-            torch.nn.BatchNorm1d(256),
-            torch.nn.Dropout(),
-            torch.nn.ReLU(),
-            torch.nn.Linear(256, 1),
+            torch.nn.Linear(768 * 2, 1),
             torch.nn.Sigmoid()
         )
 
@@ -25,6 +21,24 @@ class BertCls(torch.nn.Module):
         ebd2, cls2 = self.bert(ste2)
         conact = torch.cat((ebd1[:, 0, :], ebd2[:, 0, :]), dim=1)
         out = self.liner(conact)
+        return out
+
+
+class BertClsJoint(torch.nn.Module):
+    def __init__(self):
+        super(BertClsJoint, self).__init__()
+        self.bert = BertModel.from_pretrained(config.bert_model_path)
+        self.liner = torch.nn.Sequential(
+            torch.nn.BatchNorm1d(768),
+            torch.nn.Dropout(),
+            torch.nn.Linear(768, 1),
+            torch.nn.Sigmoid()
+        )
+
+    def forward(self, ste12):
+        ebd1, cls1 = self.bert(ste12)
+        cls = ebd1[:, 0, :]
+        out = self.liner(cls)
         return out
 
 
@@ -67,9 +81,16 @@ def train(model, train_data, test_data, epoch=30):
     loss_sum = 0.7
     idx = 0
     for e in range(epoch):
-        for s1, s2, l in train_data:
+        for td in train_data:
             optimizer.zero_grad()
-            y = model(s1, s2)
+
+            if config.JIONT:
+                s1, l = td
+                y = model(s1)
+            else:
+                s1, s2, l = td
+                y = model(s1, s2)
+
             loss = loss_fn(y, l)
             loss.backward()
             optimizer.step()
@@ -86,8 +107,13 @@ def cal_loss(model, data):
     loss_sum = 0.7
     loss_fn = torch.nn.BCELoss()
     with torch.no_grad():
-        for s1, s2, l in data:
-            y = model(s1, s2)
+        for td in data:
+            if config.JIONT:
+                s1, l = td
+                y = model(s1)
+            else:
+                s1, s2, l = td
+                y = model(s1, s2)
             loss = loss_fn(y, l)
             loss_sum = 0.9 * loss_sum + 0.1 * loss
     return loss_sum
@@ -117,13 +143,24 @@ def evaluate(model, test_data):
 
 
 if __name__ == '__main__':
-    # cls_model = BertCls()
-    # freeze_parameter(cls_model)
-
-    cls_model = XLNetCls()
+    #bert 2 ste
+    # bert joint ste
+    if config.JIONT:
+        cls_model = BertClsJoint()
+    else:
+        cls_model = BertCls()
+    freeze_parameter(cls_model)
     cls_model.cuda()
-
-    train_data, test_data = get_xlnet_dataloader()
+    train_data, test_data = get_bert_dataloader()
     train(cls_model, train_data, test_data, epoch=50)
     evaluate(cls_model, train_data)
     evaluate(cls_model, test_data)
+
+
+    # # xlnet
+    # cls_model = XLNetCls()
+    # cls_model.cuda()
+    # train_data, test_data = get_xlnet_dataloader()
+    # train(cls_model, train_data, test_data, epoch=50)
+    # evaluate(cls_model, train_data)
+    # evaluate(cls_model, test_data)
