@@ -133,7 +133,9 @@ def train(model, train_data, test_data, epoch=30):
             loss_sum = 0.9 * loss_sum + 0.1 * loss
             if idx % 100 == 99:
                 test_loss = cal_loss(model, test_data)
-                print('epoch:{} iter:{} loss:{} test_loss:{}'.format(e, idx, loss_sum, test_loss))
+                P, R, F1 = evaluate(model, test_data)
+                print('epoch:{} iter:{} loss:{} test_loss:{} P:{} R:{} F1:{}'
+                      .format(e, idx, loss_sum, test_loss, P, R, F1))
             idx += 1
 
 
@@ -168,7 +170,7 @@ def evaluate(model, test_data):
     P = right / preidt_p
     R = right / positive
     F1 = 2 * P * R / (P + R)
-    print('P:{} R:{} F1:{}'.format(P, R, F1))
+    return P, R, F1
 
 
 if __name__ == '__main__':
@@ -181,9 +183,11 @@ if __name__ == '__main__':
     freeze_parameter(cls_model)
     cls_model.cuda()
     train_data, test_data = get_bert_dataloader()
-    train(cls_model, train_data, test_data, epoch=50)
-    evaluate(cls_model, train_data)
-    evaluate(cls_model, test_data)
+    train(cls_model, train_data, test_data, epoch=20)
+    P, R, F1 = evaluate(cls_model, train_data)
+    print('train P:{} R:{} F1:{}'.format(P, R, F1))
+    P, R, F1 = evaluate(cls_model, test_data)
+    print('test P:{} R:{} F1:{}'.format(P, R, F1))
 
     # # xlnet
     # cls_model = XLNetCls()
