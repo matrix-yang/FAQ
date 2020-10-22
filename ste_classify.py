@@ -41,14 +41,16 @@ class BertCls(torch.nn.Module):
         pooled = torch.max(last_hidden_states, axis=1)[0]
         return pooled
 
-    def forward(self, ste1, ste2, mask1, mask2):
+    def forward(self, ste1, ste2, mask1, mask2, idf1, idf2):
         ebd1, cls1 = self.bert(ste1)
         ebd2, cls2 = self.bert(ste2)
         # ste_ebd1, ste_ebd2 = self.cal_ste_ebd(ebd1, ebd2)
-        max_pool1 = self.masked_max_pooling(ebd1, mask1)
-        max_pool2 = self.masked_max_pooling(ebd2, mask2)
+        # max_pool1 = self.masked_max_pooling(ebd1, mask1)
+        # max_pool2 = self.masked_max_pooling(ebd2, mask2)
         # max_pool2, indices2 = torch.max(ebd2, dim=1)
-        conact = torch.cat((max_pool1, max_pool2), dim=1)
+        ste1_ebd = idf1.unsqueeze(2).mul(ebd1).sum(dim=1)
+        ste2_ebd = idf2.unsqueeze(2).mul(ebd2).sum(dim=1)
+        conact = torch.cat((ste1_ebd, ste2_ebd), dim=1)
         out = self.liner(conact)
         return out
 
@@ -103,6 +105,16 @@ def freeze_parameter(cls_model):
             p.requires_grad = True
 
 
+def model_forward(td, model):
+    if config.JIONT:
+        s1, l = td
+        y = model(s1)
+    else:
+        s1_t, s2_t, s1_mask, s2_mask, s1_idf, s2_idf, l = td
+        y = model(s1_t, s2_t, s1_mask, s2_mask, s1_idf, s2_idf)
+    return y, l
+
+
 def train(model, train_data, test_data, epoch=30):
     loss_fn = torch.nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=10e-5)
@@ -112,15 +124,7 @@ def train(model, train_data, test_data, epoch=30):
     for e in range(epoch):
         for td in train_data:
             optimizer.zero_grad()
-
-            if config.JIONT:
-                s1, l = td
-                y = model(s1)
-            else:
-                s1_t, s2_t, s1_mask, s2_mask, l = td
-                # print(s1_t.shape)
-                y = model(s1_t, s2_t, s1_mask, s2_mask)
-
+            y, l = model_forward(td, model)
             loss = loss_fn(y, l)
             loss.backward()
             optimizer.step()
@@ -138,12 +142,7 @@ def cal_loss(model, data):
     loss_fn = torch.nn.BCELoss()
     with torch.no_grad():
         for td in data:
-            if config.JIONT:
-                s1, l = td
-                y = model(s1)
-            else:
-                s1_t, s2_t, s1_mask, s2_mask, l = td
-                y = model(s1_t, s2_t, s1_mask, s2_mask)
+            y, l = model_forward(td, model)
             loss = loss_fn(y, l)
             loss_sum = 0.9 * loss_sum + 0.1 * loss
     return loss_sum
@@ -156,12 +155,7 @@ def evaluate(model, test_data):
     positive = 0.1
     with torch.no_grad():
         for td in test_data:
-            if config.JIONT:
-                s1, l = td
-                y = model(s1)
-            else:
-                s1_t, s2_t, s1_mask, s2_mask, l = td
-                y = model(s1_t, s2_t, s1_mask, s2_mask)
+            y, l = model_forward(td, model)
             y = y.cpu().view(-1).numpy()
             y[y > 0.5] = 1
             y[y <= 0.5] = 0
