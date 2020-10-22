@@ -20,13 +20,19 @@ class PairDS(Dataset):
         else:
             # s1_t = self.tokenizer.encode_plus(s1, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
             # s2_t = self.tokenizer.encode_plus(s2, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
-            s1_t = self.tokenizer.encode(s1, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
-            s2_t = self.tokenizer.encode(s2, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
+            s1 = self.tokenizer.encode_plus(s1, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
+            s2 = self.tokenizer.encode_plus(s2, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
 
-            s1_t = torch.tensor(s1_t).cuda()
-            s2_t = torch.tensor(s2_t).cuda()
-            label = torch.tensor([l], dtype=torch.float).cuda()
-            return s1_t, s2_t, label
+            s1_t = torch.tensor(s1['input_ids'], device=config.DEVICE)
+            s2_t = torch.tensor(s2['input_ids'], device=config.DEVICE)
+            s1_mask = torch.tensor(s1['attention_mask'], device=config.DEVICE)
+            s2_mask = torch.tensor(s2['attention_mask'], device=config.DEVICE)
+            l = torch.tensor([l], dtype=torch.float).cuda()
+
+            # s1_t = torch.tensor(s1_t).cuda()
+            # s2_t = torch.tensor(s2_t).cuda()
+            # label = torch.tensor([l], dtype=torch.float).cuda()
+            return s1_t, s2_t, s1_mask, s2_mask, l
 
     def __len__(self):
         return len(self.pairs)
