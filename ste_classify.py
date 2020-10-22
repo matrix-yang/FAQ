@@ -8,7 +8,7 @@ from utils.process_data import get_bert_dataloader, get_xlnet_dataloader
 class BertCls(torch.nn.Module):
     def __init__(self):
         super(BertCls, self).__init__()
-        self.bert = BertModel.from_pretrained(config.bert_model_path)
+        self.bert = BertModel.from_pretrained(config.BERT_MODEL_PATH)
         self.liner = torch.nn.Sequential(
             torch.nn.BatchNorm1d(768 * 2),
             torch.nn.Dropout(),
@@ -27,7 +27,7 @@ class BertCls(torch.nn.Module):
 class BertClsJoint(torch.nn.Module):
     def __init__(self):
         super(BertClsJoint, self).__init__()
-        self.bert = BertModel.from_pretrained(config.bert_model_path)
+        self.bert = BertModel.from_pretrained(config.BERT_MODEL_PATH)
         self.liner = torch.nn.Sequential(
             torch.nn.BatchNorm1d(768),
             torch.nn.Dropout(),
@@ -45,7 +45,7 @@ class BertClsJoint(torch.nn.Module):
 class XLNetCls(torch.nn.Module):
     def __init__(self):
         super(XLNetCls, self).__init__()
-        self.xlnet = XLNetModel.from_pretrained(config.XLNet_model_path)
+        self.xlnet = XLNetModel.from_pretrained(config.XLNET_MODEL_PATH)
         self.liner = torch.nn.Sequential(
             torch.nn.BatchNorm1d(768 * 2),
             torch.nn.Dropout(),

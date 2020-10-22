@@ -13,15 +13,15 @@ class PairDS(Dataset):
     def __getitem__(self, index):
         s1, s2, l = self.pairs[index]
         if config.JIONT:
-            s_t = self.tokenizer.encode(s1, s2, pad_to_max_length=True, max_length=config.sentence_max_len)
+            s_t = self.tokenizer.encode(s1, s2, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
             s_t = torch.tensor(s_t).cuda()
             label = torch.tensor([l], dtype=torch.float).cuda()
             return s_t, label
         else:
-            # s1_t = self.tokenizer.encode_plus(s1, pad_to_max_length=True, max_length=config.sentence_max_len)
-            # s2_t = self.tokenizer.encode_plus(s2, pad_to_max_length=True, max_length=config.sentence_max_len)
-            s1_t = self.tokenizer.encode(s1, pad_to_max_length=True, max_length=config.sentence_max_len)
-            s2_t = self.tokenizer.encode(s2, pad_to_max_length=True, max_length=config.sentence_max_len)
+            # s1_t = self.tokenizer.encode_plus(s1, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
+            # s2_t = self.tokenizer.encode_plus(s2, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
+            s1_t = self.tokenizer.encode(s1, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
+            s2_t = self.tokenizer.encode(s2, pad_to_max_length=True, max_length=config.SENTENCE_MAX_LEN)
 
             s1_t = torch.tensor(s1_t).cuda()
             s2_t = torch.tensor(s2_t).cuda()
@@ -65,10 +65,10 @@ def get_dataloader(tokenizer, joint=False):
 
 
 def get_bert_dataloader():
-    bert_tokenizer = BertTokenizer.from_pretrained(config.bert_model_path)
+    bert_tokenizer = BertTokenizer.from_pretrained(config.BERT_MODEL_PATH)
     return get_dataloader(bert_tokenizer)
 
 
 def get_xlnet_dataloader():
-    xlnet_tokenizer = XLNetTokenizer.from_pretrained(config.XLNet_model_path)
+    xlnet_tokenizer = XLNetTokenizer.from_pretrained(config.XLNET_MODEL_PATH)
     return get_dataloader(xlnet_tokenizer)
