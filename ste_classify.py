@@ -9,11 +9,11 @@ class BertCls(torch.nn.Module):
     def __init__(self):
         super(BertCls, self).__init__()
         self.bert = BertModel.from_pretrained(config.BERT_MODEL_PATH)
-        self.encoder = torch.nn.TransformerEncoderLayer(config.EMBEDDING_DIM * 2, 8)
+        self.encoder = torch.nn.TransformerEncoderLayer(config.EMBEDDING_DIM, 8)
         self.liner = torch.nn.Sequential(
-            torch.nn.BatchNorm1d(config.EMBEDDING_DIM * 2),
+            torch.nn.BatchNorm1d(config.EMBEDDING_DIM),
             torch.nn.Dropout(),
-            torch.nn.Linear(config.EMBEDDING_DIM * 2, config.EMBEDDING_DIM),
+            torch.nn.Linear(config.EMBEDDING_DIM, config.EMBEDDING_DIM),
             torch.nn.BatchNorm1d(config.EMBEDDING_DIM),
             torch.nn.Dropout(),
             torch.nn.Linear(config.EMBEDDING_DIM, 1),
@@ -21,8 +21,8 @@ class BertCls(torch.nn.Module):
         )
 
         # 句子的注意力变量(1*50),各个子的ebd
-        # self.weight1 = torch.nn.Linear(1, config.SENTENCE_MAX_LEN, bias=False)
-        # self.weight2 = torch.nn.Linear(1, config.SENTENCE_MAX_LEN, bias=False)
+        self.weight1 = torch.nn.Linear(1, config.SENTENCE_MAX_LEN, bias=False)
+        self.weight2 = torch.nn.Linear(1, config.SENTENCE_MAX_LEN, bias=False)
 
     def cal_ste_ebd(self, ebd1, ebd2):
         batch, len_, dim = ebd1.shape
@@ -48,16 +48,37 @@ class BertCls(torch.nn.Module):
     def forward(self, ste1, ste2, mask1, mask2, idf1, idf2):
         ebd1, _ = self.bert(ste1)
         ebd2, _ = self.bert(ste2)
-        # ste_ebd1, ste_ebd2 = self.cal_ste_ebd(ebd1, ebd2)
+
+        # 直接使用线性层拼接
+        # contact = torch.cat((ebd1[:, 0, :], ebd2[:, 0, :]), dim=1)
+        # out = self.liner(contact)
+
+        # 使用max_pooling
         # max_pool1 = self.masked_max_pooling(ebd1, mask1)
         # max_pool2 = self.masked_max_pooling(ebd2, mask2)
-        # max_pool2, indices2 = torch.max(ebd2, dim=1)
+        # contact = torch.cat((max_pool1, max_pool2), dim=1)
+        # out = self.liner(contact)
+
+        # 使用atten
+        # ste_ebd1, ste_ebd2 = self.cal_ste_ebd(ebd1, ebd2)
+        # contact = torch.cat((ste_ebd1, ste_ebd2), dim=1)
+        # out = self.liner(contact)
+
+        # 使用idf加权
         # ste1_ebd = idf1.unsqueeze(2).mul(ebd1).sum(dim=1)
         # ste2_ebd = idf2.unsqueeze(2).mul(ebd2).sum(dim=1)
-        contact = torch.cat((ebd1, ebd2), dim=2)
+        # contact = torch.cat((ste1_ebd, ste2_ebd), dim=1)
+        # out = self.liner(contact)
+
+        # 使用transformer encoder layer
+        contact = torch.cat((ebd1, ebd2), dim=1)
+        mask = torch.cat((mask1, mask2), dim=1)
         contact = contact.transpose(0, 1)
         o = self.encoder(contact)
-        out = self.liner(o[0])
+        o = o.transpose(0, 1)
+        max_pool = self.masked_max_pooling(o, mask)
+        out = self.liner(max_pool)
+
         return out
 
 
@@ -123,7 +144,7 @@ def model_forward(td, model):
 
 def train(model, train_data, test_data, epoch=30):
     loss_fn = torch.nn.BCELoss()
-    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.05)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.5)
 
     loss_sum = 0.7
     idx = 0
