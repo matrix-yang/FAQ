@@ -9,10 +9,14 @@ class BertCls(torch.nn.Module):
     def __init__(self):
         super(BertCls, self).__init__()
         self.bert = BertModel.from_pretrained(config.BERT_MODEL_PATH)
+        self.encoder = torch.nn.TransformerEncoderLayer(config.EMBEDDING_DIM * 2, 8)
         self.liner = torch.nn.Sequential(
             torch.nn.BatchNorm1d(config.EMBEDDING_DIM * 2),
             torch.nn.Dropout(),
-            torch.nn.Linear(config.EMBEDDING_DIM * 2, 1),
+            torch.nn.Linear(config.EMBEDDING_DIM * 2, config.EMBEDDING_DIM),
+            torch.nn.BatchNorm1d(config.EMBEDDING_DIM),
+            torch.nn.Dropout(),
+            torch.nn.Linear(config.EMBEDDING_DIM, 1),
             torch.nn.Sigmoid()
         )
 
@@ -42,16 +46,18 @@ class BertCls(torch.nn.Module):
         return pooled
 
     def forward(self, ste1, ste2, mask1, mask2, idf1, idf2):
-        ebd1, cls1 = self.bert(ste1)
-        ebd2, cls2 = self.bert(ste2)
+        ebd1, _ = self.bert(ste1)
+        ebd2, _ = self.bert(ste2)
         # ste_ebd1, ste_ebd2 = self.cal_ste_ebd(ebd1, ebd2)
         # max_pool1 = self.masked_max_pooling(ebd1, mask1)
         # max_pool2 = self.masked_max_pooling(ebd2, mask2)
         # max_pool2, indices2 = torch.max(ebd2, dim=1)
-        ste1_ebd = idf1.unsqueeze(2).mul(ebd1).sum(dim=1)
-        ste2_ebd = idf2.unsqueeze(2).mul(ebd2).sum(dim=1)
-        conact = torch.cat((ste1_ebd, ste2_ebd), dim=1)
-        out = self.liner(conact)
+        # ste1_ebd = idf1.unsqueeze(2).mul(ebd1).sum(dim=1)
+        # ste2_ebd = idf2.unsqueeze(2).mul(ebd2).sum(dim=1)
+        contact = torch.cat((ebd1, ebd2), dim=2)
+        contact = contact.transpose(0, 1)
+        o = self.encoder(contact)
+        out = self.liner(o[0])
         return out
 
 
@@ -117,7 +123,7 @@ def model_forward(td, model):
 
 def train(model, train_data, test_data, epoch=30):
     loss_fn = torch.nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=10e-5)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.05)
 
     loss_sum = 0.7
     idx = 0
@@ -131,7 +137,7 @@ def train(model, train_data, test_data, epoch=30):
 
             # 指数平均
             loss_sum = 0.9 * loss_sum + 0.1 * loss
-            if idx % 100 == 99:
+            if idx % 100 == 0:
                 test_loss = cal_loss(model, test_data)
                 P, R, F1 = evaluate(model, test_data)
                 print('epoch:{} iter:{} loss:{} test_loss:{} P:{} R:{} F1:{}'
@@ -146,7 +152,7 @@ def cal_loss(model, data):
         for td in data:
             y, l = model_forward(td, model)
             loss = loss_fn(y, l)
-            loss_sum = 0.9 * loss_sum + 0.1 * loss
+            loss_sum = 0.99 * loss_sum + 0.01 * loss
     return loss_sum
 
 
@@ -184,6 +190,7 @@ if __name__ == '__main__':
     cls_model.cuda()
     train_data, test_data = get_bert_dataloader()
     train(cls_model, train_data, test_data, epoch=20)
+
     P, R, F1 = evaluate(cls_model, train_data)
     print('train P:{} R:{} F1:{}'.format(P, R, F1))
     P, R, F1 = evaluate(cls_model, test_data)
