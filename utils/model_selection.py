@@ -21,7 +21,9 @@ class ModelManager:
         if name is None: name = self.name
         name = self.name + '_%.4f' % self.score
         print('best model score : {}'.format(self.score))
-        torch.save(self.best_state_dict, config.MODEL_DIR + name + '.model')
+        save_path = config.MODEL_DIR + name + '.model'
+        print('model will save to : {}'.format(save_path))
+        torch.save(self.best_state_dict, save_path)
 
     def save_model(self, name=None):
         if name is None: name = self.name
