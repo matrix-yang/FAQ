@@ -137,9 +137,11 @@ def train(model, train_data, test_data, epoch=30):
                 print('epoch:{} iter:{} loss:{} test_loss:{} P:{} R:{} F1:{}'
                       .format(e, idx, loss_sum, test_loss, P, R, F1))
 
-                # 保存模型
+                # 选择模型
                 model_manager.select_model(F1)
             idx += 1
+    # 输出最优模型到文件
+    model_manager.save_best()
 
 
 def cal_loss(model, data):
