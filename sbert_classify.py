@@ -1,8 +1,9 @@
 import torch
-from transformers import BertModel, XLNetModel
+from transformers import BertModel
 import torch.optim as optim
 from utils import config
-from utils.process_data import get_bert_dataloader, get_xlnet_dataloader
+from utils.process_data import get_bert_dataloader
+from utils.model_selection import ModelManager
 
 
 class SBertCls(torch.nn.Module):
@@ -45,6 +46,21 @@ class SBertCls(torch.nn.Module):
         pooled = torch.max(last_hidden_states, axis=1)[0]
         return pooled
 
+    def masked_avg_pooling(self, states, masks):
+        # batch_size,1
+        batch_len = masks.sum(dim=1).unsqueeze(dim=1)
+
+        # batch_size, seq_len, hidden_dim
+        m = masks.unsqueeze(2)
+
+        # Set masked units to zero
+        pad_zero = states * m
+        len_sum = pad_zero.sum(dim=1)
+
+        # mean
+        avg_pool = len_sum / batch_len
+        return avg_pool
+
     def forward(self, ste1, ste2, mask1, mask2, idf1, idf2):
         ebd1, _ = self.bert(ste1)
         ebd2, _ = self.bert(ste2)
@@ -52,6 +68,10 @@ class SBertCls(torch.nn.Module):
         # 使用max_pooling
         max_pool1 = self.masked_max_pooling(ebd1, mask1)
         max_pool2 = self.masked_max_pooling(ebd2, mask2)
+
+        # 使用avg_pooling
+        # max_pool1 = self.masked_avg_pooling(ebd1, mask1)
+        # max_pool2 = self.masked_avg_pooling(ebd2, mask2)
         # 分类输出
         contact = torch.cat((max_pool1, max_pool2, torch.abs(max_pool1 - max_pool2)), dim=1)
         out = self.liner(contact)
@@ -81,20 +101,19 @@ def freeze_parameter(cls_model):
 
 
 def model_forward(td, model):
-    if config.JIONT:
-        s1, l = td
-        y = model(s1)
-    else:
-        s1_t, s2_t, s1_mask, s2_mask, s1_idf, s2_idf, l = td
-        y, cos = model(s1_t, s2_t, s1_mask, s2_mask, s1_idf, s2_idf)
+    s1_t, s2_t, s1_mask, s2_mask, s1_idf, s2_idf, l = td
+    y, cos = model(s1_t, s2_t, s1_mask, s2_mask, s1_idf, s2_idf)
     return y, cos, l
 
 
 def train(model, train_data, test_data, epoch=30):
+    # 损失函数
     classify_loss_fn = torch.nn.BCELoss()
     regression_loss_fn = torch.nn.MSELoss()
+    # 优化器
     optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.5)
-
+    # 模型保存/提前终止
+    model_manager = ModelManager(model, name='sbert_cls_reg')
     loss_sum = 0.7
     idx = 0
     for e in range(epoch):
@@ -103,9 +122,10 @@ def train(model, train_data, test_data, epoch=30):
             y, cos, l = model_forward(td, model)
             loss1 = classify_loss_fn(y, l)
 
-            # l[l == 0] = -1
-            loss2 = regression_loss_fn(cos, l)
-            loss = loss2
+            l_cos = l.clone().detach()
+            # l_cos[l_cos == 0] = -1
+            loss2 = regression_loss_fn(cos, l_cos)
+            loss = loss1 + loss2
             loss.backward()
             optimizer.step()
 
@@ -116,6 +136,9 @@ def train(model, train_data, test_data, epoch=30):
                 P, R, F1 = evaluate(model, test_data)
                 print('epoch:{} iter:{} loss:{} test_loss:{} P:{} R:{} F1:{}'
                       .format(e, idx, loss_sum, test_loss, P, R, F1))
+
+                # 保存模型
+                model_manager.select_model(F1)
             idx += 1
 
 
@@ -130,7 +153,7 @@ def cal_loss(model, data):
 
             # l[l == 0] = -1
             loss2 = regression_loss_fn(cos, l)
-            loss = loss1
+            loss = loss1 + loss2
             loss_sum = 0.99 * loss_sum + 0.01 * loss
     return loss_sum
 
@@ -143,9 +166,9 @@ def evaluate(model, test_data):
     with torch.no_grad():
         for td in test_data:
             y, cos, l = model_forward(td, model)
-            y = cos.cpu().view(-1).numpy()
-            y[y > 0.7] = 1
-            y[y <= 0.7] = 0
+            y = y.cpu().view(-1).numpy()
+            y[y > 0.5] = 1
+            y[y <= 0.5] = 0
             preidt_p += y.sum()
 
             l = l.cpu().view(-1).numpy()
@@ -161,10 +184,7 @@ def evaluate(model, test_data):
 if __name__ == '__main__':
     # bert 2 ste
     # bert joint ste
-    if config.JIONT:
-        pass
-    else:
-        cls_model = SBertCls()
+    cls_model = SBertCls()
     freeze_parameter(cls_model)
     cls_model.cuda()
     train_data, test_data = get_bert_dataloader()
